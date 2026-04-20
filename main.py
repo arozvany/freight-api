@@ -96,7 +96,12 @@ async def verify_carrier(mc_number: str = Query(...)):
     url = f"https://mobile.fmcsa.dot.gov/qc/services/carriers/docket-number/{mc_number}"
     async with httpx.AsyncClient() as client:
         try:
-            resp = await client.get(url, params={"webKey": fmcsa_key}, timeout=10)
+            resp = await client.get(
+    	        url, 
+    	        params={"webKey": fmcsa_key},
+    	        headers={"Accept": "application/json"},
+    	        timeout=10
+	    )
             raw = resp.text
             data = resp.json()
             carrier = data.get("content", {}).get("carrier", {})
