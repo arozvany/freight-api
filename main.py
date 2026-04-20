@@ -87,23 +87,17 @@ def search_loads(
 
 
 @app.get("/carrier/verify", dependencies=[Depends(verify_api_key)])
-async def verify_carrier(mc_number: str = Query(..., description="Carrier MC number")):
+async def verify_carrier(mc_number: str = Query(...)):
     fmcsa_key = os.getenv("FMCSA_KEY", "")
 
     if not fmcsa_key:
-        # Mock response when no FMCSA key is set (for testing)
-        return {
-            "eligible": True,
-            "carrier_name": "Test Carrier LLC",
-            "mc_number": mc_number,
-            "operating_status": "AUTHORIZED FOR HIRE",
-            "source": "mock"
-        }
+        return {"eligible": True, "carrier_name": "Mock Carrier", "mc_number": mc_number, "source": "mock"}
 
     url = f"https://mobile.fmcsa.dot.gov/qc/services/carriers/docket-number/{mc_number}"
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(url, params={"webKey": fmcsa_key}, timeout=10)
+            raw = resp.text
             data = resp.json()
             carrier = data.get("content", {}).get("carrier", {})
             allowed = carrier.get("allowedToOperate", "N")
@@ -112,12 +106,13 @@ async def verify_carrier(mc_number: str = Query(..., description="Carrier MC num
                 "carrier_name": carrier.get("legalName", "Unknown"),
                 "mc_number": mc_number,
                 "operating_status": carrier.get("operatingStatus", "Unknown"),
+                "raw_response": data,
                 "source": "fmcsa"
             }
         except Exception as e:
             return {
                 "eligible": None,
-                "error": "Verification service unavailable",
+                "error": str(e),
                 "mc_number": mc_number,
                 "source": "error"
             }
