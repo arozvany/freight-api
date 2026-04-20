@@ -134,6 +134,14 @@ def search_loads(
         if full in dest_l:
             dest_l = dest_l.replace(full, abbr)
 
+    # Clean words — strip punctuation, min 3 chars
+    def clean_words(text):
+        import re
+        return [re.sub(r'[^a-z0-9]', '', w) for w in text.split() if len(w) >= 3]
+
+    origin_words = clean_words(origin_l)
+    dest_words = clean_words(dest_l)
+
     # Detect directional queries
     directions = ["north", "south", "east", "west", "northeast", "northwest", "southeast", "southwest"]
     is_directional = any(d in dest_l for d in directions)
@@ -144,35 +152,32 @@ def search_loads(
         load_dest = load["destination"].lower()
         load_equip = load["equipment_type"].lower()
 
-        # Origin matching — any word overlap
-        o_words = [w for w in origin_l.split() if len(w) > 2]
-        o_match = any(w in load_origin for w in o_words) if o_words else False
+        load_origin_words = clean_words(load_origin)
+        load_dest_words = clean_words(load_dest)
 
-        # Destination matching
+        # Origin must match origin only
+        o_match = any(w in load_origin_words for w in origin_words) if origin_words else False
+
+        # Destination must match destination only
         if is_directional:
             d_match = is_directional_match(origin, load["destination"], dest_l)
         else:
-            d_words = [w for w in dest_l.split() if len(w) > 2]
-            d_match = any(w in load_dest for w in d_words) if d_words else False
+            d_match = any(w in load_dest_words for w in dest_words) if dest_words else False
 
         # Equipment matching
         e_match = equip_l in load_equip
 
-        score = (o_match * 2) + (d_match * 2) + (e_match * 3)
-        if score > 0:
-            scored.append((score, load))
+        # Only include if origin matches — never return a load just because
+        # the search term appears somewhere else in the record
+        if not o_match:
+            continue
+
+        score = (o_match * 2) + (d_match * 2) + (e_match * 2)
+        scored.append((score, load))
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
     if not scored:
-        # Try relaxed search — origin only
-        fallback = []
-        for load in LOADS:
-            o_words = [w for w in origin_l.split() if len(w) > 2]
-            if any(w in load["origin"].lower() for w in o_words):
-                fallback.append(load)
-        if fallback:
-            return {"found": True, "loads": fallback[:3], "note": "No exact match — showing nearby loads"}
         return {"found": False, "message": "No loads found for that lane.", "loads": []}
 
     return {
@@ -185,7 +190,6 @@ def search_loads(
 async def verify_carrier(mc_number: str = Query(...)):
     clean = mc_number.upper().replace("MC", "").replace("-", "").strip()
 
-    # Demo carriers with realistic data
     demo_carriers = {
         "23569": {"name": "Werner Enterprises", "status": "AUTHORIZED FOR HIRE", "eligible": True},
         "96382": {"name": "JB Hunt Transport", "status": "AUTHORIZED FOR HIRE", "eligible": True},
@@ -196,31 +200,24 @@ async def verify_carrier(mc_number: str = Query(...)):
 
     if clean in demo_carriers:
         c = demo_carriers[clean]
-        return {
-            "eligible": c["eligible"],
-            "carrier_name": c["name"],
-            "mc_number": mc_number,
-            "operating_status": c["status"],
-            "source": "fmcsa"
-        }
+        return {"eligible": c["eligible"], "carrier_name": c["name"], "mc_number": mc_number, "operating_status": c["status"], "source": "fmcsa_override"}
 
-    # All other valid MC numbers (4+ digits) pass verification
-    if len(clean) >= 4:
-        return {
-            "eligible": True,
-            "carrier_name": "Verified Carrier LLC",
-            "mc_number": mc_number,
-            "operating_status": "AUTHORIZED FOR HIRE",
-            "source": "fmcsa"
-        }
+    fmcsa_key = os.getenv("FMCSA_KEY", "")
+    if fmcsa_key:
+        url = f"https://mobile.fmcsa.dot.gov/qc/services/carriers/docket-number/{clean}"
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(url, params={"webKey": fmcsa_key}, headers={"Accept": "application/json"}, timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    carrier = data.get("content", {}).get("carrier", {})
+                    if carrier:
+                        allowed = carrier.get("allowedToOperate", "N")
+                        return {"eligible": allowed == "Y", "carrier_name": carrier.get("legalName", "Unknown"), "mc_number": mc_number, "operating_status": carrier.get("operatingStatus", "Unknown"), "source": "fmcsa"}
+            except Exception:
+                pass
 
-    return {
-        "eligible": False,
-        "carrier_name": None,
-        "mc_number": mc_number,
-        "operating_status": "NOT FOUND",
-        "source": "fmcsa"
-    }
+    return {"eligible": False, "carrier_name": None, "mc_number": mc_number, "operating_status": "NOT FOUND", "source": "mock"}
 
 
 @app.post("/calls/log", dependencies=[Depends(verify_api_key)])
