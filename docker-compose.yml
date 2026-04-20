@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY=acme-secret-key-123
+      - FMCSA_KEY=your_fmcsa_key_here
+    restart: unless-stopped
