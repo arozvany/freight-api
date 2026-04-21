@@ -246,7 +246,7 @@ async def verify_carrier(mc_number: str = Query(...)):
 def log_call(call: CallLog):
     entry = call.to_log()
     entry["id"] = len(CALL_LOGS) + 1
-    entry["logged_at"] = datetime.utcnow().isoformat()
+    entry["logged_at"] = datetime.utcnow().isoformat() + "Z"
     CALL_LOGS.append(entry)
     return {"success": True, "call_id": entry["id"], "total_calls": len(CALL_LOGS)}
 
@@ -254,6 +254,12 @@ def log_call(call: CallLog):
 @app.get("/calls", dependencies=[Depends(verify_api_key)])
 def get_calls():
     return {"calls": CALL_LOGS, "total": len(CALL_LOGS)}
+
+
+@app.delete("/calls", dependencies=[Depends(verify_api_key)])
+def clear_calls():
+    CALL_LOGS.clear()
+    return {"success": True, "message": "All call logs cleared"}
 
 
 @app.get("/dashboard/metrics", dependencies=[Depends(verify_api_key)])
