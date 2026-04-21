@@ -231,7 +231,7 @@
 
   .chart-wrap {
     position: relative;
-    height: 200px;
+    height: 170px;
   }
 
   /* Sentiment bars */
@@ -688,10 +688,13 @@ function renderBookingsChart(calls) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
+          position: 'bottom',
           labels: {
             color: '#6b6b80',
             font: { family: 'DM Mono', size: 10 },
-            boxWidth: 8, boxHeight: 8
+            boxWidth: 8,
+            boxHeight: 8,
+            padding: 12
           }
         }
       },
