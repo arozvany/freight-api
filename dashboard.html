@@ -450,6 +450,22 @@
     </div>
   </div>
 
+  <!-- Lanes Row -->
+  <div class="charts-row" id="lanes-row" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 32px;">
+    <div class="chart-card">
+      <div class="card-title">Top Origins</div>
+      <div id="top-origins"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">Top Destinations</div>
+      <div id="top-destinations"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">Top Lanes</div>
+      <div id="top-lanes"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+
   <!-- Calls Table -->
   <div class="table-card">
     <div class="table-header">
@@ -527,6 +543,9 @@ async function loadData() {
     renderOutcomesChart(metrics.outcomes || {});
     renderBookingsChart(callsData.calls || []);
     renderSentiment(metrics.sentiments || {}, metrics.total_calls);
+    renderLaneList('top-origins', metrics.top_origins || []);
+    renderLaneList('top-destinations', metrics.top_destinations || []);
+    renderLaneList('top-lanes', metrics.top_lanes || []);
     renderTable(callsData.calls || []);
 
     document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
@@ -557,9 +576,9 @@ function renderStats(m) {
       <div class="stat-sub">booked loads</div>
     </div>
     <div class="stat-card fade-in stagger-4">
-      <div class="stat-label">Avg Rate</div>
-      <div class="stat-value accent">${formatRate(m.avg_rate)}</div>
-      <div class="stat-sub">per booked load</div>
+      <div class="stat-label">Avg Rate Uplift</div>
+      <div class="stat-value ${m.avg_rate_uplift_pct > 5 ? 'red' : m.avg_rate_uplift_pct > 0 ? 'accent' : 'green'}">${m.avg_rate_uplift_pct > 0 ? '+' : ''}${m.avg_rate_uplift_pct}%</div>
+      <div class="stat-sub">above loadboard rate</div>
     </div>
     <div class="stat-card fade-in stagger-5">
       <div class="stat-label">Avg Negotiation</div>
@@ -746,6 +765,24 @@ function renderTable(calls) {
       </tbody>
     </table>
   `;
+}
+
+function renderLaneList(id, data) {
+  const el = document.getElementById(id);
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="empty" style="padding:20px"><div class="empty-icon">—</div>No data yet</div>';
+    return;
+  }
+  const max = data[0][1];
+  el.innerHTML = data.map(([label, count]) => `
+    <div class="sentiment-row fade-in" style="margin-bottom:12px">
+      <div class="sentiment-label" style="width:auto;flex:1;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
+      <div class="sentiment-bar-wrap" style="width:60px;flex:none;margin:0 10px">
+        <div class="sentiment-bar" style="width:${Math.round(count/max*100)}%;background:var(--accent)"></div>
+      </div>
+      <div class="sentiment-count">${count}</div>
+    </div>
+  `).join('');
 }
 
 loadData();
