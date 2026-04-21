@@ -103,6 +103,7 @@ class CallLog(BaseModel):
     lane_origin: Optional[str] = None
     lane_destination: Optional[str] = None
     load_id: Optional[str] = None
+    equipment_type: Optional[str] = None
     loadboard_rate: Optional[str] = None
     carrier_initial_offer: Optional[str] = None
     final_agreed_rate: Optional[str] = None
@@ -124,6 +125,7 @@ class CallLog(BaseModel):
             "lane_origin": self.lane_origin,
             "lane_destination": self.lane_destination,
             "load_id": self.load_id,
+            "equipment_type": self.equipment_type,
             "loadboard_rate": safe_float(self.loadboard_rate),
             "carrier_initial_offer": safe_float(self.carrier_initial_offer),
             "final_agreed_rate": safe_float(self.final_agreed_rate),
@@ -293,13 +295,52 @@ def get_metrics():
         if c.get("negotiation_rounds") is not None:
             negotiation_rounds.append(c["negotiation_rounds"])
 
+    # Rate uplift calculation
+    uplift_pcts = []
+    for c in CALL_LOGS:
+        lb = c.get("loadboard_rate")
+        agreed = c.get("final_agreed_rate")
+        if lb and agreed and lb > 0:
+            uplift_pcts.append((agreed - lb) / lb * 100)
+
+    # Equipment type breakdown
+    equipment_counts = {}
+    for c in CALL_LOGS:
+        eq = c.get("equipment_type")
+        if eq:
+            equipment_counts[eq] = equipment_counts.get(eq, 0) + 1
+
+    # Popular origins and destinations
+    origins = {}
+    destinations = {}
+    lanes = {}
+    for c in CALL_LOGS:
+        o = c.get("lane_origin")
+        d = c.get("lane_destination")
+        if o:
+            origins[o] = origins.get(o, 0) + 1
+        if d:
+            destinations[d] = destinations.get(d, 0) + 1
+        if o and d:
+            lane = f"{o} → {d}"
+            lanes[lane] = lanes.get(lane, 0) + 1
+
+    top_origins = sorted(origins.items(), key=lambda x: x[1], reverse=True)[:5]
+    top_destinations = sorted(destinations.items(), key=lambda x: x[1], reverse=True)[:5]
+    top_lanes = sorted(lanes.items(), key=lambda x: x[1], reverse=True)[:5]
+
     return {
         "total_calls": total,
         "booking_rate_pct": round(len(booked_rates) / total * 100, 1),
         "total_revenue": round(sum(booked_rates), 2),
         "avg_rate": round(sum(booked_rates) / len(booked_rates), 2) if booked_rates else 0,
         "avg_negotiation_rounds": round(sum(negotiation_rounds) / len(negotiation_rounds), 1) if negotiation_rounds else 0,
+        "avg_rate_uplift_pct": round(sum(uplift_pcts) / len(uplift_pcts), 1) if uplift_pcts else 0,
         "outcomes": outcomes,
         "sentiments": sentiments,
+        "equipment_breakdown": equipment_counts,
+        "top_origins": top_origins,
+        "top_destinations": top_destinations,
+        "top_lanes": top_lanes,
         "recent_calls": CALL_LOGS[-5:]
     }

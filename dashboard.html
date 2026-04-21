@@ -208,7 +208,7 @@
   /* Charts row */
   .charts-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: 16px;
     margin-bottom: 32px;
   }
@@ -448,6 +448,12 @@
         <div class="loading"><div class="spinner"></div></div>
       </div>
     </div>
+    <div class="chart-card">
+      <div class="card-title">Equipment Types</div>
+      <div class="chart-wrap">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
   </div>
 
   <!-- Lanes Row -->
@@ -487,6 +493,7 @@ const headers = { 'X-API-Key': API_KEY };
 
 let outcomesChart = null;
 let bookingsChart = null;
+let equipmentChart = null;
 
 function outcomeLabel(o) {
   const map = {
@@ -543,6 +550,7 @@ async function loadData() {
     renderOutcomesChart(metrics.outcomes || {});
     renderBookingsChart(callsData.calls || []);
     renderSentiment(metrics.sentiments || {}, metrics.total_calls);
+    renderEquipmentChart(metrics.equipment_breakdown || {});
     renderLaneList('top-origins', metrics.top_origins || []);
     renderLaneList('top-destinations', metrics.top_destinations || []);
     renderLaneList('top-lanes', metrics.top_lanes || []);
@@ -765,6 +773,52 @@ function renderTable(calls) {
       </tbody>
     </table>
   `;
+}
+
+function renderEquipmentChart(equipment) {
+  const card = document.getElementById('charts-row').children[3];
+  card.innerHTML = `<div class="card-title">Equipment Types</div><div class="chart-wrap"><canvas id="equipment-canvas"></canvas></div>`;
+
+  const labels = Object.keys(equipment);
+  const values = Object.values(equipment);
+  const colors = ['#f0b429', '#3ecf8e', '#4a9eff'];
+
+  if (equipmentChart) equipmentChart.destroy();
+
+  if (!labels.length) {
+    card.innerHTML = `<div class="card-title">Equipment Types</div><div class="empty" style="padding:40px"><div class="empty-icon">🚛</div>No data yet</div>`;
+    return;
+  }
+
+  equipmentChart = new Chart(document.getElementById('equipment-canvas'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors.slice(0, values.length),
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#6b6b80',
+            font: { family: 'DM Mono', size: 10 },
+            padding: 12,
+            boxWidth: 8,
+            boxHeight: 8
+          }
+        }
+      },
+      cutout: '65%'
+    }
+  });
 }
 
 function renderLaneList(id, data) {
