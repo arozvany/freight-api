@@ -444,7 +444,7 @@
     </div>
     <div class="chart-card">
       <div class="card-title">Carrier Sentiment</div>
-      <div class="sentiment-bars" id="sentiment-bars">
+      <div class="chart-wrap" id="sentiment-wrap">
         <div class="loading"><div class="spinner"></div></div>
       </div>
     </div>
@@ -494,6 +494,7 @@ const headers = { 'X-API-Key': API_KEY };
 let outcomesChart = null;
 let bookingsChart = null;
 let equipmentChart = null;
+let sentimentChart = null;
 
 function outcomeLabel(o) {
   const map = {
@@ -657,24 +658,28 @@ function renderBookingsChart(calls) {
 
   if (bookingsChart) bookingsChart.destroy();
 
+  const notBooked = totals.map((t, i) => t - booked[i]);
+
   bookingsChart = new Chart(document.getElementById('bookings-canvas'), {
     type: 'bar',
     data: {
       labels: dates.map(d => d === 'unknown' ? 'unknown' : d.slice(5)),
       datasets: [
         {
-          label: 'Total Calls',
-          data: totals,
-          backgroundColor: 'rgba(107,107,128,0.3)',
-          borderRadius: 3,
-          borderWidth: 0
-        },
-        {
           label: 'Booked',
           data: booked,
           backgroundColor: '#3ecf8e',
-          borderRadius: 3,
-          borderWidth: 0
+          borderRadius: 0,
+          borderWidth: 0,
+          stack: 'calls'
+        },
+        {
+          label: 'Not Booked',
+          data: notBooked,
+          backgroundColor: 'rgba(107,107,128,0.3)',
+          borderRadius: 0,
+          borderWidth: 0,
+          stack: 'calls'
         }
       ]
     },
@@ -692,10 +697,12 @@ function renderBookingsChart(calls) {
       },
       scales: {
         x: {
+          stacked: true,
           ticks: { color: '#6b6b80', font: { family: 'DM Mono', size: 9 } },
           grid: { color: 'rgba(30,30,46,0.8)' }
         },
         y: {
+          stacked: true,
           ticks: { color: '#6b6b80', font: { family: 'DM Mono', size: 9 }, stepSize: 1 },
           grid: { color: 'rgba(30,30,46,0.8)' }
         }
@@ -705,28 +712,52 @@ function renderBookingsChart(calls) {
 }
 
 function renderSentiment(sentiments, total) {
-  const container = document.getElementById('sentiment-bars');
-  const colors = { positive: '#3ecf8e', neutral: '#f0b429', negative: '#e84d4d' };
-  const order = ['positive', 'neutral', 'negative'];
+  const wrap = document.getElementById('sentiment-wrap');
 
-  if (!total) {
-    container.innerHTML = '<div class="empty"><div class="empty-icon">📊</div>No data yet</div>';
+  if (!total || !Object.keys(sentiments).length) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">📊</div>No data yet</div>';
     return;
   }
 
-  container.innerHTML = order.map(key => {
-    const count = sentiments[key] || 0;
-    const pct = total ? Math.round(count / total * 100) : 0;
-    return `
-      <div class="sentiment-row fade-in">
-        <div class="sentiment-label">${key}</div>
-        <div class="sentiment-bar-wrap">
-          <div class="sentiment-bar" style="width:${pct}%;background:${colors[key]}"></div>
-        </div>
-        <div class="sentiment-count">${count}</div>
-      </div>
-    `;
-  }).join('');
+  wrap.innerHTML = '<canvas id="sentiment-canvas"></canvas>';
+
+  const order = ['positive', 'neutral', 'negative'];
+  const colors = { positive: '#3ecf8e', neutral: '#f0b429', negative: '#e84d4d' };
+  const labels = order.filter(k => sentiments[k]);
+  const values = labels.map(k => sentiments[k] || 0);
+  const bgColors = labels.map(k => colors[k]);
+
+  if (sentimentChart) sentimentChart.destroy();
+
+  sentimentChart = new Chart(document.getElementById('sentiment-canvas'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: bgColors,
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#6b6b80',
+            font: { family: 'DM Mono', size: 10 },
+            padding: 12,
+            boxWidth: 8,
+            boxHeight: 8
+          }
+        }
+      },
+      cutout: '65%'
+    }
+  });
 }
 
 function renderTable(calls) {
