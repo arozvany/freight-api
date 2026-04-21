@@ -55,7 +55,7 @@
   header {
     border-bottom: 1px solid var(--border);
     padding: 24px 0;
-    margin-bottom: 40px;
+    margin-bottom: 16px;
     position: relative;
     z-index: 1;
   }
@@ -152,7 +152,7 @@
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 16px;
-    margin-bottom: 32px;
+    margin-bottom: 16px;
   }
 
   .stat-card {
@@ -210,7 +210,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: 16px;
-    margin-bottom: 32px;
+    margin-bottom: 16px;
   }
 
   .chart-card {
@@ -385,6 +385,43 @@
 
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* Pagination */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .page-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .page-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .page-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+  .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .page-info {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    padding: 0 8px;
+  }
+
   /* Fade in */
   .fade-in {
     animation: fadeIn 0.4s ease forwards;
@@ -499,6 +536,9 @@ let outcomesChart = null;
 let bookingsChart = null;
 let equipmentChart = null;
 let sentimentChart = null;
+let currentPage = 1;
+const PAGE_SIZE = 8;
+let allCalls = [];
 
 function outcomeLabel(o) {
   const map = {
@@ -559,7 +599,8 @@ async function loadData() {
     renderLaneList('top-origins', metrics.top_origins || []);
     renderLaneList('top-destinations', metrics.top_destinations || []);
     renderLaneList('top-lanes', metrics.top_lanes || []);
-    renderTable(callsData.calls || []);
+    allCalls = [...(callsData.calls || [])].reverse();
+    renderTable(allCalls, currentPage);
 
     document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
 
@@ -767,11 +808,9 @@ function renderSentiment(sentiments, total) {
   });
 }
 
-function renderTable(calls) {
+function renderTable(calls, page) {
   const wrap = document.getElementById('table-wrap');
   const countEl = document.getElementById('call-count');
-
-  const sorted = [...calls].reverse();
   countEl.textContent = calls.length + ' total';
 
   if (!calls.length) {
@@ -779,14 +818,23 @@ function renderTable(calls) {
     return;
   }
 
+  const totalPages = Math.ceil(calls.length / PAGE_SIZE);
+  const start = (page - 1) * PAGE_SIZE;
+  const paginated = calls.slice(start, start + PAGE_SIZE);
+
+  const pageButtons = [];
+  for (let i = 1; i <= totalPages; i++) {
+    pageButtons.push(`<button class="page-btn ${i === page ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`);
+  }
+
   wrap.innerHTML = `
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>M C Number</th>
+          <th>MC Number</th>
           <th>Lane</th>
-          <th>Load I D</th>
+          <th>Load ID</th>
           <th>Outcome</th>
           <th>Sentiment</th>
           <th>Agreed Rate</th>
@@ -795,7 +843,7 @@ function renderTable(calls) {
         </tr>
       </thead>
       <tbody>
-        ${sorted.map(c => `
+        ${paginated.map(c => `
           <tr class="fade-in">
             <td style="color:var(--muted)">${c.id || '—'}</td>
             <td>${c.carrier_mc || '—'}</td>
@@ -810,7 +858,21 @@ function renderTable(calls) {
         `).join('')}
       </tbody>
     </table>
+    ${totalPages > 1 ? `
+    <div class="pagination">
+      <button class="page-btn" onclick="goToPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>←</button>
+      ${pageButtons.join('')}
+      <button class="page-btn" onclick="goToPage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>→</button>
+      <span class="page-info">${start + 1}–${Math.min(start + PAGE_SIZE, calls.length)} of ${calls.length}</span>
+    </div>` : ''}
   `;
+}
+
+function goToPage(page) {
+  const totalPages = Math.ceil(allCalls.length / PAGE_SIZE);
+  if (page < 1 || page > totalPages) return;
+  currentPage = page;
+  renderTable(allCalls, currentPage);
 }
 
 function renderEquipmentChart(equipment) {
