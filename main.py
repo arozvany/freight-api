@@ -103,13 +103,35 @@ class CallLog(BaseModel):
     lane_origin: Optional[str] = None
     lane_destination: Optional[str] = None
     load_id: Optional[str] = None
-    loadboard_rate: Optional[float] = None
-    carrier_initial_offer: Optional[float] = None
-    final_agreed_rate: Optional[float] = None
-    negotiation_rounds: Optional[int] = None
+    loadboard_rate: Optional[str] = None
+    carrier_initial_offer: Optional[str] = None
+    final_agreed_rate: Optional[str] = None
+    negotiation_rounds: Optional[str] = None
     call_outcome: Optional[str] = None
     carrier_sentiment: Optional[str] = None
     key_notes: Optional[str] = None
+
+    def to_log(self):
+        def safe_float(v):
+            try: return float(v)
+            except: return None
+        def safe_int(v):
+            try: return int(v)
+            except: return None
+        return {
+            "carrier_mc": self.carrier_mc,
+            "carrier_verified": self.carrier_verified,
+            "lane_origin": self.lane_origin,
+            "lane_destination": self.lane_destination,
+            "load_id": self.load_id,
+            "loadboard_rate": safe_float(self.loadboard_rate),
+            "carrier_initial_offer": safe_float(self.carrier_initial_offer),
+            "final_agreed_rate": safe_float(self.final_agreed_rate),
+            "negotiation_rounds": safe_int(self.negotiation_rounds),
+            "call_outcome": self.call_outcome,
+            "carrier_sentiment": self.carrier_sentiment,
+            "key_notes": self.key_notes,
+        }
 
 # --- Endpoints ---
 
@@ -222,7 +244,7 @@ async def verify_carrier(mc_number: str = Query(...)):
 
 @app.post("/calls/log", dependencies=[Depends(verify_api_key)])
 def log_call(call: CallLog):
-    entry = call.dict()
+    entry = call.to_log()
     entry["id"] = len(CALL_LOGS) + 1
     entry["logged_at"] = datetime.utcnow().isoformat()
     CALL_LOGS.append(entry)
