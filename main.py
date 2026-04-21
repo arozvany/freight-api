@@ -209,7 +209,7 @@ def search_loads(
 
 @app.get("/carrier/verify", dependencies=[Depends(verify_api_key)])
 async def verify_carrier(mc_number: str = Query(...)):
-    clean = mc_number.upper().replace("MC", "").replace("-", "").strip()
+    clean = ''.join(filter(str.isdigit, mc_number))
 
     demo_carriers = {
         "23569": {"name": "Werner Enterprises", "status": "AUTHORIZED FOR HIRE", "eligible": True},
