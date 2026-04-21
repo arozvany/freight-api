@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
 import json
@@ -111,6 +112,12 @@ class CallLog(BaseModel):
     key_notes: Optional[str] = None
 
 # --- Endpoints ---
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def serve_dashboard():
+    with open("dashboard.html") as f:
+        return f.read()
+
 
 @app.get("/health")
 def health():

@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acme Logistics — Carrier Call Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #f0b429;
+    --accent2: #3ecf8e;
+    --accent3: #e84d4d;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --card-bg: #13131c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Header */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 24px 0;
+    margin-bottom: 40px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-mark {
+    width: 36px;
+    height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    font-size: 14px;
+    color: #000;
+  }
+
+  .logo-text {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status-dot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent2);
+    box-shadow: 0 0 8px var(--accent2);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .refresh-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+  }
+
+  .refresh-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .stat-card:hover { border-color: var(--accent); }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .stat-card:hover::before { opacity: 1; }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 10px;
+  }
+
+  .stat-value {
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.green { color: var(--accent2); }
+  .stat-value.red { color: var(--accent3); }
+
+  .stat-sub {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Charts row */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .chart-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .card-title {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 20px;
+  }
+
+  .chart-wrap {
+    position: relative;
+    height: 200px;
+  }
+
+  /* Sentiment bars */
+  .sentiment-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-top: 8px;
+  }
+
+  .sentiment-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .sentiment-label {
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    width: 60px;
+    flex-shrink: 0;
+  }
+
+  .sentiment-bar-wrap {
+    flex: 1;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .sentiment-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .sentiment-count {
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    color: var(--text);
+    width: 24px;
+    text-align: right;
+  }
+
+  /* Calls table */
+  .table-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+
+  .table-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    padding: 12px 24px;
+    text-align: left;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-family: 'DM Mono', monospace;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+  tbody td {
+    padding: 14px 24px;
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    color: var(--text);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+
+  .badge-green { background: rgba(62,207,142,0.12); color: var(--accent2); }
+  .badge-red { background: rgba(232,77,77,0.12); color: var(--accent3); }
+  .badge-yellow { background: rgba(240,180,41,0.12); color: var(--accent); }
+  .badge-gray { background: rgba(107,107,128,0.15); color: var(--muted); }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+  }
+
+  .empty-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+
+  /* Loading */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Fade in */
+  .fade-in {
+    animation: fadeIn 0.4s ease forwards;
+    opacity: 0;
+  }
+
+  @keyframes fadeIn {
+    to { opacity: 1; }
+  }
+
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-mark">AL</div>
+        <div>
+          <div class="logo-text">Acme Logistics</div>
+          <div class="logo-sub">Carrier Call Intelligence</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="status-dot">
+          <div class="dot"></div>
+          <span id="last-updated">Loading...</span>
+        </div>
+        <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="loading"><div class="spinner"></div> Loading</div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row" id="charts-row">
+    <div class="chart-card">
+      <div class="card-title">Call Outcomes</div>
+      <div class="chart-wrap">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">Bookings Over Time</div>
+      <div class="chart-wrap">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">Carrier Sentiment</div>
+      <div class="sentiment-bars" id="sentiment-bars">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calls Table -->
+  <div class="table-card">
+    <div class="table-header">
+      <div class="card-title" style="margin:0">Recent Calls</div>
+      <div class="status-dot" id="call-count">—</div>
+    </div>
+    <div id="table-wrap">
+      <div class="loading"><div class="spinner"></div> Loading calls</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+const API_KEY = 'acme-secret-key-123';
+
+const headers = { 'X-API-Key': API_KEY };
+
+let outcomesChart = null;
+let bookingsChart = null;
+
+function outcomeLabel(o) {
+  const map = {
+    booked_transferred: 'Booked',
+    no_load_found: 'No Load',
+    negotiation_failed: 'Neg. Failed',
+    presented_not_interested: 'Not Interested',
+    declined_unverified: 'Unverified',
+    verification_inconclusive: 'Inconclusive',
+    unknown: 'Unknown'
+  };
+  return map[o] || o;
+}
+
+function outcomeBadge(o) {
+  if (o === 'booked_transferred') return 'badge-green';
+  if (o === 'negotiation_failed') return 'badge-red';
+  if (o === 'declined_unverified') return 'badge-red';
+  if (o === 'no_load_found') return 'badge-yellow';
+  return 'badge-gray';
+}
+
+function sentimentBadge(s) {
+  if (s === 'positive') return 'badge-green';
+  if (s === 'negative') return 'badge-red';
+  return 'badge-gray';
+}
+
+function formatRate(r) {
+  if (!r) return '—';
+  return '$' + Number(r).toLocaleString();
+}
+
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+
+async function loadData() {
+  try {
+    const [metricsRes, callsRes] = await Promise.all([
+      fetch(`${API_BASE}/dashboard/metrics`, { headers }),
+      fetch(`${API_BASE}/calls`, { headers })
+    ]);
+
+    const metrics = await metricsRes.json();
+    const callsData = await callsRes.json();
+
+    renderStats(metrics);
+    renderOutcomesChart(metrics.outcomes || {});
+    renderBookingsChart(callsData.calls || []);
+    renderSentiment(metrics.sentiments || {}, metrics.total_calls);
+    renderTable(callsData.calls || []);
+
+    document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderStats(m) {
+  const grid = document.getElementById('stats-grid');
+  const bookingColor = m.booking_rate_pct >= 50 ? 'green' : m.booking_rate_pct >= 25 ? 'accent' : 'red';
+
+  grid.innerHTML = `
+    <div class="stat-card fade-in stagger-1">
+      <div class="stat-label">Total Calls</div>
+      <div class="stat-value accent">${m.total_calls}</div>
+      <div class="stat-sub">all time</div>
+    </div>
+    <div class="stat-card fade-in stagger-2">
+      <div class="stat-label">Booking Rate</div>
+      <div class="stat-value ${bookingColor}">${m.booking_rate_pct}%</div>
+      <div class="stat-sub">calls booked</div>
+    </div>
+    <div class="stat-card fade-in stagger-3">
+      <div class="stat-label">Total Revenue</div>
+      <div class="stat-value green">${formatRate(m.total_revenue)}</div>
+      <div class="stat-sub">booked loads</div>
+    </div>
+    <div class="stat-card fade-in stagger-4">
+      <div class="stat-label">Avg Rate</div>
+      <div class="stat-value accent">${formatRate(m.avg_rate)}</div>
+      <div class="stat-sub">per booked load</div>
+    </div>
+    <div class="stat-card fade-in stagger-5">
+      <div class="stat-label">Avg Negotiation</div>
+      <div class="stat-value">${m.avg_negotiation_rounds || '—'}</div>
+      <div class="stat-sub">rounds per call</div>
+    </div>
+  `;
+}
+
+function renderOutcomesChart(outcomes) {
+  const card = document.getElementById('charts-row').children[0];
+  card.innerHTML = `<div class="card-title">Call Outcomes</div><div class="chart-wrap"><canvas id="outcomes-canvas"></canvas></div>`;
+
+  const labels = Object.keys(outcomes).map(outcomeLabel);
+  const values = Object.values(outcomes);
+  const colors = ['#3ecf8e','#e84d4d','#f0b429','#6b6b80','#4a9eff','#c084fc'];
+
+  if (outcomesChart) outcomesChart.destroy();
+
+  outcomesChart = new Chart(document.getElementById('outcomes-canvas'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors.slice(0, values.length),
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#6b6b80',
+            font: { family: 'DM Mono', size: 10 },
+            padding: 12,
+            boxWidth: 8,
+            boxHeight: 8,
+            borderRadius: 2
+          }
+        }
+      },
+      cutout: '65%'
+    }
+  });
+}
+
+function renderBookingsChart(calls) {
+  const card = document.getElementById('charts-row').children[1];
+  card.innerHTML = `<div class="card-title">Bookings Over Time</div><div class="chart-wrap"><canvas id="bookings-canvas"></canvas></div>`;
+
+  // Group by date
+  const byDate = {};
+  calls.forEach(c => {
+    const date = c.logged_at ? c.logged_at.split('T')[0] : 'unknown';
+    if (!byDate[date]) byDate[date] = { total: 0, booked: 0 };
+    byDate[date].total++;
+    if (c.call_outcome === 'booked_transferred') byDate[date].booked++;
+  });
+
+  const dates = Object.keys(byDate).sort().slice(-14);
+  const totals = dates.map(d => byDate[d].total);
+  const booked = dates.map(d => byDate[d].booked);
+
+  if (bookingsChart) bookingsChart.destroy();
+
+  bookingsChart = new Chart(document.getElementById('bookings-canvas'), {
+    type: 'bar',
+    data: {
+      labels: dates.map(d => d === 'unknown' ? 'unknown' : d.slice(5)),
+      datasets: [
+        {
+          label: 'Total Calls',
+          data: totals,
+          backgroundColor: 'rgba(107,107,128,0.3)',
+          borderRadius: 3,
+          borderWidth: 0
+        },
+        {
+          label: 'Booked',
+          data: booked,
+          backgroundColor: '#3ecf8e',
+          borderRadius: 3,
+          borderWidth: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#6b6b80',
+            font: { family: 'DM Mono', size: 10 },
+            boxWidth: 8, boxHeight: 8
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#6b6b80', font: { family: 'DM Mono', size: 9 } },
+          grid: { color: 'rgba(30,30,46,0.8)' }
+        },
+        y: {
+          ticks: { color: '#6b6b80', font: { family: 'DM Mono', size: 9 }, stepSize: 1 },
+          grid: { color: 'rgba(30,30,46,0.8)' }
+        }
+      }
+    }
+  });
+}
+
+function renderSentiment(sentiments, total) {
+  const container = document.getElementById('sentiment-bars');
+  const colors = { positive: '#3ecf8e', neutral: '#f0b429', negative: '#e84d4d' };
+  const order = ['positive', 'neutral', 'negative'];
+
+  if (!total) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">📊</div>No data yet</div>';
+    return;
+  }
+
+  container.innerHTML = order.map(key => {
+    const count = sentiments[key] || 0;
+    const pct = total ? Math.round(count / total * 100) : 0;
+    return `
+      <div class="sentiment-row fade-in">
+        <div class="sentiment-label">${key}</div>
+        <div class="sentiment-bar-wrap">
+          <div class="sentiment-bar" style="width:${pct}%;background:${colors[key]}"></div>
+        </div>
+        <div class="sentiment-count">${count}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTable(calls) {
+  const wrap = document.getElementById('table-wrap');
+  const countEl = document.getElementById('call-count');
+
+  const sorted = [...calls].reverse();
+  countEl.textContent = calls.length + ' total';
+
+  if (!calls.length) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">📞</div>No calls logged yet — run a demo call to see data here</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>M C Number</th>
+          <th>Lane</th>
+          <th>Load I D</th>
+          <th>Outcome</th>
+          <th>Sentiment</th>
+          <th>Agreed Rate</th>
+          <th>Rounds</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sorted.map(c => `
+          <tr class="fade-in">
+            <td style="color:var(--muted)">${c.id || '—'}</td>
+            <td>${c.carrier_mc || '—'}</td>
+            <td style="color:var(--muted)">${c.lane_origin || '?'} → ${c.lane_destination || '?'}</td>
+            <td style="color:var(--muted)">${c.load_id || '—'}</td>
+            <td><span class="badge ${outcomeBadge(c.call_outcome)}">${outcomeLabel(c.call_outcome || 'unknown')}</span></td>
+            <td><span class="badge ${sentimentBadge(c.carrier_sentiment)}">${c.carrier_sentiment || '—'}</span></td>
+            <td>${formatRate(c.final_agreed_rate)}</td>
+            <td style="text-align:center">${c.negotiation_rounds ?? '—'}</td>
+            <td style="color:var(--muted)">${timeAgo(c.logged_at)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>
